@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html>
+  <head prefix="og: https://ogp.me/ns#">
+    <title>ATmega32u2直付けのキーパッドを作ろう！</title>
+    <meta name="author" content="はやしたろう">
+    <meta property="og:url" content="https://Taro-Hayashi.github.io/LetsMakeaKeypadWithAtmega32u2.html" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="ATmega32u2直付けのキーパッドを作ろう！" />
+    <meta property="og:description" content="キーボード #3 Advent Calendar 2021 の22日目の記事です。" />
+    <meta property="og:site_name" content="Taro-Hayashi.github.io" />
+    <meta property="og:image" content="img/pagethumb.jpg" />
+    <style>
+    body{
+      padding: 0px 8% ;
+    }
+    p{
+      img width: 100%
+      margin: 0.5em;
+      line-height: 1.4em;
+    }
+    .image {
+      max-width: 100%;
+    }
+    .title {
+      max-width: 80%;
+    }
+    </style>
+  </head>
+
+  <body>
+    <h1>ATmega32u2直付けのキーパッドを作ろう！</h1>
+    <p><img src="img/pagethumb.jpg" class="title"></p>
+      <p><a href="https://adventar.org/calendars/6496">キーボード #3 Advent Calendar 2021</a> の22日目の記事です。</p>
+
+      <h2 id=intr>ごあいさつ</h2>
+        はじめまして、はやしたろうと申します。
+        <p>
+      </p>
+      <p>
+        キーボードをMCU直付けで作ろうと思ったときに日本語の記事が少なくてハードルが高く感じました。
+        キーパッドを作る過程をメモするついでに公開することでまとまった情報を共有しつつ、あわよくば詳しい人にダメ出しして貰おうと思って書きました。
+        基本的にはai03さんのPCBデザインガイドに沿って設計しています。
+      </p>
+      <p>
+         <ul>
+           <li><a href="https://wiki.ai03.com/books/pcb-design/chapter/pcb-designer-guide">PCB Designer Guide</a></li>
+         </ul>
+      </p>
+      <p>
+        回路以外の部分も作りはじめから完成までの流れを書いてみました。
+        既にkicadを使っている人向けの内容ですが、これから設計を始めてみたい方にもキーボードができるまでの流れを感じ取ってもらえるかもしれません。
+        他人がどういう流れで作業をしているか見ることはあまりないと思うので楽しんでもらえたら嬉しいです。
+      </p>
+
+
+      <h2 id=intr>もくじ</h2>
+      <ul>
+        <li><a href="#prepcb">PCBの設計（仮）</a></li>
+        <li><a href="#circuit">回路の設計</a></li>
+        <li><a href="#pcb">PCBの設計</a></li>
+        <li><a href="#paltes">プレートと基板の外形</a></li>
+        <li><a href="#routing">配線</a></li>
+        <li><a href="#gerber">データの準備と発注</a></li>
+        <li><a href="#firmware">ファームウェアの作成</a></li>
+        <li><a href="#assembling">組み立て</a></li>
+        <li><a href="#done">撮影</a></li>
+        <li><a href="#cncl">おわりに</a></li>
+      </ul>
+
+
+      <h2 id=prepcb>PCBの設計（仮）</h2>
+      <p>
+        さっそく回路を設計といきたいところですが、まずは基板をどうするかをおおまかに決めるためにPcbnewを起動します。
+      </p>
+      <p>
+        今回は17 x 18 mmの狭ピッチなのでグリッドの幅を1 mmにします。
+      </p>
+      <p><img src="img/01.jpg" class="image"></p>
+      <p>
+        一つ目のスイッチを(0, 0)に置いたら、複製して並べてレイアウトを決めます。
+        3行のキーパッドにしたいのですが、完全な格子だとぱっと見でどこに何があるかわからないので最上段は半キーずらしました。
+      </p>
+      <p><img src="img/03.png" class="image"></p>
+      <p>
+        大体のフットプリントはデフォルトのライブラリや<a href="https://github.com/foostan/kbd/">foostanさんのもの</a>、<a href="https://github.com/keebio/Keebio-Parts.pretty">keebioさんのもの</a>を改変して使っています。
+        キースイッチはChoc V1のホール以外を消して枠線も17 x 18 mmに変えています。
+        使うものだけを集めた自分用のライブラリを作ると管理がとても楽になります。
+      </p>
+      <p><img src="img/05.png" class="image"></p>
+      <p>
+        バックライトとアンダーグローを並べます。
+        仮置きなので大体で十分です。
+        アンダーグローはWS2812Bでもいいのですがはんだ付けのしやすいSK6812MINI-Eのフットプリントを逆向きにしたのものを用意して使いました。
+      </p>
+      <p><img src="img/06.png" class="image"></p>
+      <p>
+        MCUの場所を決めました。
+        手はんだに使えるATmega32には10 x 10 mmのATmega32U4（ProMicroに使われているもの）と7 x 7 mmのATmega32U2の2種類の大きさがあります。
+        1Uサイズのキーキャップしか使わないマクロパッドでU4を採用すると、それ用の余白を作るかバックライトを諦めるしかないので今回はU2を使います。
+        Package_QFPのTQFP-327x7ｍｍ_P0.8mmです。40度傾けるとギリギリ収まりました。
+      </p>
+      <p><img src="img/07.png" class="image"></p>
+      <p>
+        USB Type-Cのレセプタクルを配置します。
+        秋月電子さんのType-Cコネクタに対応しているのはConnector_USBのUSB_C_Receptacle_HRO_TYPE-C-31-M-12です。
+        USB2.0でランドの数が少ないとはいえ難易度が高いのでMicro-USBを使う方がいいかもしれません。
+      </p>
+      <p>
+        ここまで決まると配線が見えてきますがネジも先に決めておいた方がEeshemaとの往復回数が減ります。
+      </p>
+      <p><img src="img/08.png" class="image"></p>
+      <p>
+        ねじを通すためのホールを配置しました。
+        2.2mmのNPTH（導通しないただの穴）だけでなく、スペーサーの直径や2mm余白を付けた円を追加したフットプリントを作ると配線や外形のスペースを視覚的に捉えやすいです。
+      </p>
+      <p>
+        他のパーツは小さくて配置の自由度が高いのでファイルを保存して回路の設計に進みましょう。
+      </p>
+
+
+      <h2 id=circuit>回路の設計</h2>
+      <p>
+        Eeschemaを起動します。
+        MCU_Microchip_ATmegaライブラリのATmega32U2-AUを設置して、ひとまずVCCとGNDの配線を繋げてしまいます。
+      </p>
+      <p><img src="img/09.png" class="image"></p>
+      <p>
+        使えるピンは右側のPB0-PD6までで、フットプリントの6-26番にあたります（13,、24は別の用途があり使えません）。
+        今回は3x6のマトリクスなのでLEDも含めて10個使います。
+      </p>
+      <p><img src="img/10.png" class="image"></p>
+      <p>
+        仮置きしたMCUを回転や移動で調整しながら効率の良い配線になるように決めます（ここでMCUの表裏を間違えていて、あとでやり直しました）。
+      </p>
+      <p><img src="img/11.png" class="image"></p>
+      <p>
+        MCUに抵抗やコンデンサを繋げますが、このあたりは私の理解が乏しく説明があやふやになっています。シンボルはDeviceのライブラリにあります。
+      </p>
+      <p><img src="img/12.png" class="image"></p>
+      <p>
+        24番はリセットスイッチに繋げます。
+        スイッチがオフの時に安定させるためにに10 kΩのプルアップ抵抗を入れます。
+        アノテーションがズレるのが嫌いなのでリセットスイッチのシンボルは別に作っています。
+      </p>
+      <p><img src="img/13.png" class="image"></p>
+      <p>
+        XTAL1とXTAL2は水晶振動子に繋げます。
+        よくわからないのでPro Microと同じ16 MHzのFA238と22 pFのコンデンサで回路を構成していますが動いています。
+        私が発注したFA238は負荷容量が7 pFだったのですが、ちゃんと計算するとコンデンサの容量はもっと小さい方が良いみたいです。
+        こちらのWebサイトが参考になりました。
+      </p>
+      <p>
+         <ul>
+           <li><a href="https://lipoyang.hatenablog.com/entry/20140515/p1">滴了庵日録 - 水晶振動子につけるコンデンサの値</a></li>
+         </ul>
+      </p>
+      <p><img src="img/14.png" class="image"></p>
+      <p>
+        D+、D-はConnectorライブラリのUSB_C_Receptacle_USB2.0と繋げます。
+        間に22 Ωの抵抗を挟みます。
+        Type-C レセプタクルのCCは搭載されているデバイスがどんな役割の機器かを決めていて、キーボードでは5.1 kΩでプルダウンします。
+        VBUSとGNDも繋ぎましょう。
+      </p>
+      <p><img src="img/15.png" class="image"></p>
+      <p>
+        UCAPは1 μFのコンデンサを挟んでGNDに落とします。
+        HWBは10kΩでプルダウンします。ファームウェアを書き込むためらしいです。
+      </p>
+      <p><img src="img/16.png" class="image"></p>
+      <p>
+        VCCとGNDの間にコンデンサを挟みます。
+        デカップリングコンデンサといってノイズが減るようです。
+        コンデンサの値をどうするかは諸説あるようですが、私はこの組み合わせで動いています。
+      </p>
+      <p>
+        これでPro Micro相当の機能が実装できました。
+        結果だけ見るとややこしいですが順を追って実装すれば決して難しくはありません。
+      </p>
+      <p><img src="img/66.png" class="image"></p>
+      <p>
+        スイッチとダイオードのマトリクス、LEDを配線してホールのシンボルを置きます。
+        Pcbnewで仮置きしたことでLEDやネジ穴の個数、配線方向が明確になります。
+      </p>
+      <p><img src="img/17.png" class="image"></p>
+      <p>
+        すべての配置が終わったらアノテーション（パーツの番号振り）と配線チェックをしてシンボルにフットプリントを関連付けます。
+      </p>
+      <p><img src="img/17-1.png" class="image"></p>
+      <p>
+        フットプリントは仮置きで使ったものを指定します。
+        抵抗、コンデンサーは1206/3216サイズ、水晶振動子は3225サイズの表面実装型を使用しました。
+        これらはUSBレセプタクルやAtmega32u2と比べるとはんだ付けが簡単だったのでもう少し小さいパッケージのものにしたほうが配置が楽だったかもしれません。
+      </p>
+      <p>
+        ダイオードやリセットスイッチも表面実装を選ぶと表側に足が出ないので、トッププレートをメインボードに密着させることができます。
+        これがMCU直付けで設計することの一番のメリットだと思います。
+      </p>
+      <p>
+        ネットリストの生成をしたらファイルを保存してPcbnewに戻ります。
+      </p>
+
+
+      <h2 id=pcb>PCBの設計</h2>
+      <p><img src="img/18.png" class="image"></p>
+      <p>
+        ネットリストを読み込むときは"余分なフットプリントを削除する"のチェックを外します。
+        仮置きが消えてしまったら慌てずに保存せず終了して開き直します。
+      </p>
+      <p><img src="img/19.png" class="image"></p>
+      <p>
+        反映されたフットプリントと仮置きを邪魔にならないところまで移動させて部品を配置していきます。
+        Eeshemaを表示しているとPcbnewで選択したフットプリントが赤く光るのでわかりやすいです。
+      </p>
+      <p><img src="img/20.png" class="image"></p>
+      <p>
+        Choc V1のLEDはスイッチの中央から4.7 mm上と決まっているので相対位置を使います。
+        LEDどうしの配線がスムーズにつながるように回転させながら置きます。
+      </p>
+      <p><img src="img/21.png" class="image"></p>
+      <p>
+        水晶振動子はMCUの出来る限り近くに配置します。
+        遠すぎると配線がコンデンサーになり前述の負荷容量の計算の、回路の寄生容量が変化します（が、おそらくキーボードの設計程度だと気にする必要がないと思います）。
+      </p>
+      <p><img src="img/22.png" class="image"></p>
+      <p>
+        残りの部品も配線を気にしつつ置いていきます。
+        ネジ穴の配置を少し変更しました。
+        終わったら仮置きは削除します。
+      </p>
+
+      <h2 id=paltes>プレートと基板の外形</h2>
+      <p>
+        簡単なアクリルのケースを作ります。
+        今回はPCBを1 mm厚で作りこんな感じの断面にします。
+      </p>
+      <p><img src="img/43.png" class="image"></p>
+      <p>
+        まずはトッププレートの形状を考えます。レイヤーはMargin（マゼンダカラー）に作りました。
+      </p>
+      <p><img src="img/23.png" class="image"></p>
+      <p>プレートをアクリルで製造する場合、業者にもよりますが幅は2 mm程度までは細くできると思います。
+        狭ピッチの17 x 18 mmのキーキャップで形状ギリギリまで詰めてしまうと細すぎてしまうので、少し余白を付けました。
+        私はそこまでしませんがアクリルを切るレーザーの幅の分、さらに余白を取るのもいいと思います。
+        角は円弧で丸くしています。
+      </p>
+      <p><img src="img/24.png" class="image"></p>
+      <p>
+        トッププレートのアクリルは割れやすいのでスイッチで挟み込むだけで爪をひっかけたくありません。
+        キースイッチの穴は14 x 14.5 mmにしています。
+        ネジ穴の部分は避けました。
+      </p>
+      <p><img src="img/25.png" class="image"></p>
+      <p>
+        トッププレートが決まったらEdge.cuts（黄色）にPCBの外形を描きます。
+        左右の大きい余白部分はアクリルで透過させたいのでPCBにはしません。
+        余白用のプレートはEco2.userに描きました。
+      </p>
+      <p><img src="img/26.png" class="image"></p>
+      <p>
+        基板外形が決まったら3Dビューアーで出来上がりをチェックできるようになります。
+        これで見つかるミスも多いです。
+      </p>
+      <p><img src="img/28.png" class="image"></p>
+      <p>
+        ミドルプレートをEco1.user（緑）に描きます。
+        外形はPCBと同じなので複製して、実装されたパーツを避けるように穴をあけていきます。
+        大変ですが完成してピッタリ嵌った時に気持ちいいので頑張ります。
+      </p>
+      <p><img src="img/29.png" class="image"></p>
+      <p>
+        バックプレートの外形はトッププレートと同じです。
+        Cmts.Userレイヤー（青）に複製します。
+        リセットボタンの穴だけ忘れずに。
+      </p>
+      <p>
+        これであとは配線するだけです。
+      </p>
+
+
+      <h2 id=routing>配線</h2>
+      <p>
+        配線はFreeroutingにお任せです。
+      </p>
+      <p><img src="img/30.png" class="image"></p>
+      <p>
+        基板セットアップで配線幅が0.5 mmの電源線用のネットクラスを作りGNDとVCCに割り当てます。
+        私はクリアランスも0.25 mmに変更しています。
+      </p>
+      <p>
+        SpectraDSNファイルをエクスポートしてFreeroutingに読み込んだらAutorouterを押して配線スタートです。
+      </p>
+      <p><img src="img/31.png" class="image"></p>
+      <p>
+        配線中にPass数だけが延々増えてループすることがあります。
+        詰め込みすぎて線を通すスペースがない場合は配置を見直しましょう。
+        外形に斜めの線がある場合はエラーになりやすいので、一度長方形の基板外形に置き換えて配線してみてください。
+      </p>
+      <p><img src="img/33.png" class="image"></p>
+      <p>
+        ステータスバーがPostroute Completeになったら配線完了です。
+        忘れずにセッションファイルをエクスポートして終了します。
+      </p>
+      <p>
+        PCBnewにセッションファイルを読み込みます。
+      </p>
+      <p><img src="img/32.png" class="image"></p>
+      <p>
+        Freeroutingはホールのギリギリに線を引いたり、直角を作ったりしがちです。
+        どちらも破損の原因になるので修正していきます。
+      </p>
+      <p><img src="img/34.png" class="image"></p>
+      <p><img src="img/35.png" class="image"></p>
+      <p>
+        パッドの近くにあるビアは乗せてしまうといいそうです。
+      </p>
+      <p><img src="img/36.png" class="image"></p>
+      <p>
+        配線の修正が終わったら塗りつぶしゾーンでGNDベタを追加します。
+      </p>
+      <p><img src="img/37.png" class="image"></p>
+      <p>
+        GNDが半島になっているところはアンテナになってノイズの元になります。
+        キーボードでそこまで神経質になるところではないかもしれませんが、一応塗りつぶし禁止に指定して消していきます。
+      </p>
+      <p><img src="img/38-1.png" class="image"></p>
+      <p>
+        終わったらルールチェックをして、さらにもう一度3Dビューアで確認しましょう。
+      </p>
+      <p><img src="img/38-2.png" class="image"></p>
+
+
+      <h2 id=gerber>データの準備と発注</h2>
+      <p>
+        問題がなければガーバーファイルをプロットします。
+        左右の余白のホールはPCB上に無いのでいったん消します。
+      </p>
+      <p>
+        製造は、安いのに綺麗に作ってくれるJLCPCBさんがおすすめです。
+        JLCPCBさんはプロットの設定方法を詳しく公開しています。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://support.jlcpcb.com/article/149-how-to-generate-gerber-and-drill-files-in-kicad">https://support.jlcpcb.com/article/149-how-to-generate-gerber-and-drill-files-in-kicad</a></li>
+       </ul>
+      </p>
+      <p><img src="img/39-2.png" class="image"></p>
+      <p>
+        このように設定して製造ファイル、ドリルファイル、ドリルマップファイルを生成しました。
+      </p>
+      <p>
+        出力されたファイルをZIPでまとめたらガーバービューアで確認しましょう。
+        思わぬ失敗に気付くことがあります。
+        tracespaceだとwebブラウザへのドラッグアンドドロップで使えるので便利です。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://tracespace.io/view/">https://tracespace.io/view/</a></li>
+       </ul>
+      </p>
+      <p><img src="img/41.png" class="image"></p>
+
+      <p>
+        おかしい所がなければJLCPCBさんに提出します。
+        挟み込むために厚みは1 mmに変更しますが、理由がなければ1.6 mmの方が強度が高くおすすめです。
+        色は好きな色に変えましょう。
+      </p>
+      <p><img src="img/42.png" class="image"></p>
+      <p>
+        製造が終わって到着するまでにStandard Global Shippingで大体２週間くらい、急ぐ場合はFedexIPがかなり速くておすすめです。
+      </p>
+      <p>
+        次にアクリルプレートのデータを整えます。
+        必要なレイヤーの分だけkicad_pcbファイルを複製して、schファイルも一つ複製します。
+      </p>
+      <p><img src="img/44-2.png"></p>
+      <p>
+        複製したschを開いてホールだけ残したネットリストを作成します。
+      </p>
+      <p><img src="img/45.png" class="image"></p>
+      <p>
+        作りたいプレートのkicad_pcbを開いてネットリストを読み込んだら、ゾーン、配線、基板外形を広域削除するとプレートだけを抽出できます。
+      </p>
+      <p><img src="img/46.png" class="image"></p>
+      <p>
+        テキストと図形のプロパティーを編集で該当のレイヤーをEdge.cutsにすればプレートの外形が出来上がります。
+      </p>
+      <p><img src="img/47.png" class="image"></p>
+      <p><img src="img/48.png" class="image"></p>
+      <p>
+        アクリルで作るプレートでは、ドリルの穴は同じサイズの円に置き換えます。
+        相対位置を使ってm2のネジ穴を2.2 mm、スペーサーを3.3 mmの円で置き換えました。
+        穴の大きさはお使いの部品に合わせてください。
+      </p>
+      <p><img src="img/49.png" class="image"></p>
+      <p>
+        作成後は3DEビューワーで外形が閉じているか、おかしなところはないかチェックします。
+      </p>
+      <p><img src="img/50.png" class="image"></p>
+      <p>
+        全プレートを基板外形にしたら、新しいkicad_pcbファイルを作りアクリルプレートをコピペします。
+      </p>
+      <p><img src="img/51.png" class="image"></p>
+      <p>
+        アクリルプレートは大きなプレートの中にカットするデータを配置して、レーザーカッターで切ってもらいます。
+        今回はコスパのよい工房emerge+さん向けのデータを作ります。
+        webサイトにいってテンプレートをダウンロードしてきます。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://www.emergeplus.jp/">工房emerge+</a></li>
+         <li><a href="https://www.emergeplus.jp/laser-cutting-service/guideline/">カッティングガイドライン</a></li>
+       </ul>
+      </p>
+      <p>
+        A5サイズのテンプレートの内枠の128 x 190 mmをkicadで描画してみましたが、幸い2 mm厚も3 mm厚も収まりそうです。
+      </p>
+      <p><img src="img/52.png" class="image"></p>
+      <p>
+        配置してみます。
+        余白を使って作れるようなものを用意しておくと効率よくスペースをつかえます。
+        私が実際に発注するときはもっとギリギリまで詰め込みます。
+      </p>
+      <p><img src="img/53.png" class="image"></p>
+      <p><img src="img/54.png" class="image"></p>
+      <p>
+        SVGで出力してInkscapeでテンプレートにコピペしました。
+        全体がグループ化されているので解除して、2 mm厚用のファイルと3 mm厚用のファイルに分けます。
+      </p>
+      <p><img src="img/55.png" class="image"></p>
+      <p>
+        注意書きをよく読んで迷惑がかからないようにしましょう。
+        まずはouterレイヤーにすべてを置いて線を青色にして、内側を範囲指定したらinnerレイヤーに移して赤色にしました。
+      </p>
+      <p>
+        実装するパーツも注文します。
+        遊舎工房さんや秋月電子さんで売っていない部品はDigikeyさんで注文します。
+        絞り込み検索を上手く使いましょう。
+      </p>
+      <p><img src="img/65.png" class="title"></p>
+      <p>
+        在庫切れの部品も多いですがほとんどの場合代替品が手に入ります。
+        同じサイズのパッケージ、スペックならどれを選んでも大丈夫なのではないでしょうか（よく知りません）。
+      </p>
+      <p>
+        ネジは手に入りやすいなべ子ネジ3mmとウィルコさんの超低頭ネジ3.5 mmとなべ小ねじ2.5 mmを使います。
+        スペーサーはAliExpressのものが細くて種類もあって重宝しています。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://shop.yushakobo.jp/">遊舎工房</a></li>
+         <li><a href="https://akizukidenshi.com/catalog/">秋月電子</a></li>
+         <li><a href="https://www.digikey.jp/">Digikey</a></li>
+         <li><a href="https://wilco.jp/">ウィルコ</a></li>
+         <li><a href="https://ja.aliexpress.com/item/32968830934.html">スペーサー（Ali Express）</a></li>
+       </ul>
+      </p>
+
+      <h2 id=firmware>ファームウェアの作成</h2>
+      <p>
+        QMKの開発環境は公式のドキュメント通りにすればスムーズです。WindowsであればQMK MSYSを使うと自動でセットアップしてくれます。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://docs.qmk.fm/#/newbs_getting_started">https://docs.qmk.fm/#/newbs_getting_started</a></li>
+       </ul>
+      </p>
+      <p>
+       qmk new-keyboard で新しいキーボードのフォルダを作れます。
+       キーボード名や作者名を聞かれるので回答します。
+      </p>
+      <p><img src="img/58.png" class="image"></p>
+      <p>
+        info.jsonとreadme.mdは使わないのでとりあえず消します。
+      </p>
+      <p>
+        まずはrules.mkでマイコンを指定します。
+      </p>
+      <p><img src="img/73.png" class="image"></p>
+      <p>
+        使わない機能をnoにしてRGB MATRIXを使えるようにしました。
+      </p>
+      <p><img src="img/59.png" class="image"></p>
+      <p>
+        config.hの編集に移ります。
+        PRODUCT_IDは配布しないのであればそのままでいいですしqmkにマージするつもりがなければ適当にかぶりにくそうなものを設定しましょう。
+      </p>
+      <p><img src="img/60.png" class="image"></p>
+      <p>
+        回路図を見ながら3x6のキーマトリクスを指定します。
+      </p>
+      <p><img src="img/61.png" class="image"></p>
+      <p>
+        UNUSED_PINSは書かなくてもいいです。分割キーボードではないのでSOFT_SERIAL_PINはコメントアウトしました。
+      </p>
+      <p><img src="img/62.png" class="image"></p>
+      <p>
+        RGB MATRIXを使うための記述です。
+      </p>
+      <p><img src="img/63.png" class="image"></p>
+      <p>
+        キーボード名.hにレイアウトを書きます。
+        ここはバックスラッシュやカンマの有無を間違えるだけでエラーになります。
+      </p>
+      <p><img src="img/64.png" class="image"></p>
+      <p>
+        下段で配線上のマトリクスにキーを定義して、上段は定義したキーを整列しています。
+        上段をキーマップとして使います。
+      </p>
+      <p>
+        キーボード名.cにLEDのレイアウトを書きます。
+        わかりにくいのでブロックごとに説明します。
+      </p>
+      <p><img src="img/67.png" class="image"></p>
+      <p>
+        第1項はバックライトの指定で、キーマトリクスのどこに何番目のLEDがあるかを示しています。
+      </p>
+      <p><img src="img/68.png" class="image"></p>
+      <p>
+        RGB MATRIXではキーボードを64x224のサイズだと仮定してLEDの物理的な位置を指定します。
+        小数の計算をPCに任せるために縦横を12分割して記述を簡単にします。
+      </p>
+      <p>
+        <img src="img/70.png" class="image">
+        <img src="img/IMG_4199.jpg" class="image">
+        <img src="img/69.png" class="image">
+      </p>
+      <p>
+        次にLEDが何の役割かを指定します。
+      </p>
+      <p><img src="img/71.png" class="image"></p>
+      <p>
+        第2項、第3項は見た目のLEDの場所ではなく配線順であることに気をつけます。
+      </p>
+      <p><img src="img/72.png" class="image"></p>
+      <p>
+        キーマップをkeymap.cに書いたらファームウェアをコンパイルします。
+        Shiftなしで数字キーの記号を打ち込めるキーパッドにしてみました。
+      </p>
+
+
+      <h2 id=assembling>組み立て</h2>
+      <p>
+        パーツが到着したらいよいよ組み立てます。
+        理屈では動くとわかっていても緊張します。
+        ビルドガイドを兼ねているので少し説明が冗長かもしれません。
+      </p>
+      <p><img src="img/IMG_5290.jpg" class="image"></p>
+      <p>
+        一番難しいUSBレセプタクルを最初に片づけます。
+        表面実装のパーツは位置決めが一番重要だと思います。
+        パッドの中央にピンがくるようにマスキングテープで固定します。
+      </p>
+      <p><img src="img/IMG_4781.jpg" class="image"></p>
+      <p>
+        ピン同士がくっつかないようにフラックスを使います。
+        表にはんだが出るとトッププレートが密着しないので、固定用の足は裏からはんだ付けします。
+      </p>
+      <p><img src="img/IMG_4189.jpg" class="image"></p>
+      <p>
+        MCUの〇とシルク印刷の角を合わせます。
+      </p>
+      <p><img src="img/IMG_4783.jpg" class="image"></p>
+      <p>
+        USBレセプタクルと同じようにはんだ付けして、水晶振動子Y1、コンデンサC1～C3をはんだ付けしたところです。
+      </p>
+      <p><img src="img/IMG_4792.jpg" class="image"></p>
+      <p>
+        C4～C8です。
+      </p>
+      <p><img src="img/IMG_4795.jpg" class="image"></p>
+      <p>
+        R1～R6。
+      </p>
+      <p><img src="img/IMG_4798.jpg" class="image"></p>
+      <p>
+        リセットスイッチと動作確認用にLEDを一つはんだ付けします。
+      </p>
+      <p><img src="img/IMG_4802.jpg" class="image"></p>
+      <p>
+        動作確認のためにUSBケーブルを接続しますが、その前にGNDとVCCが短絡していないかチェックします。
+        青丸のパッドにテスターを当てて抵抗がほぼ0になってしまう場合はショートしています（0.9くらいになることはあります）。
+        USBレセプタクルの両端のピンが短絡してしまっていることが多いです。
+      </p>
+      <p>
+        ショートしていないのを確認したらUSBケーブルでPCと接続し、ファームウェアを書き込みます。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://github.com/Taro-Hayashi/Taro-Hayashi.github.io/releases/download/1.0/armors_np_via.hex">shotgun_np_via.hex</a></li>
+         <li><a href="https://github.com/Taro-Hayashi/Taro-Hayashi.github.io/releases/download/1.0/armors_np.json">shotgun_np.json（Remap/VIA用）</a></li>
+       </ul>
+      </p>
+      QMK ToolBoxではMCUをAtmega32U2に変えること（そして他のキーボードでは戻すこと）を忘れやすいです。
+      <p>
+        <p><img src="img/74.png" class="image"></p>
+      </p>
+      <p>
+        ここまでの設計、ファームウェアのコンパイル、組み立てがすべて上手くいっているとLEDが光ります。ちゃんと動くことがわかるとひと安心です。
+      </p>
+      <p><img src="img/IMG_4803.jpg" class="image"></p>
+      <p>
+        残りのLEDやダイオードも取り付けました。
+      </p>
+      <p><img src="img/IMG_4806.jpg" class="image"></p>
+      <p>
+        キースイッチはルブをするついでにRed ProとRed Crystalを組み合わせて白くて透明なスイッチを作りました。
+        残った真っ赤なスイッチは使う予定がないので遊舎工房さんに委託しているキットの展示品に付けてみました。
+      </p>
+      <p><img src="img/IMG_4945.jpg" class="image"></p>
+      <p>
+        ルブステーションはTALP KEYBOARDさんで売っているものと、自作のChoc専用の台を使っています。
+        販売もしているのでぜひご覧ください。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://talpkeyboard.net/items/60c20caffadad456b8ceef6a">TALP KEYBOARD - KBDfans switches lube station ルブ用小型作業ボード（アクリル/グレー）</a></li>
+         <li><a href="https://tarohayashi.booth.pm/items/3497944">BOOTH - Choc V1 ステム&トップハウジングステーション</a></li>
+       </ul>
+      </p>
+      <p>
+        トッププレートの4隅のスイッチだけはんだ付けしてズレないように固定します。
+      </p>
+      <p><img src="img/IMG_4949.jpg" class="image"></p>
+      <p>
+        全てのスイッチをはんだ付けしたらスペーサーを取り付けます。
+        アクリルのトッププレートには4mmなべネジで4mmのスペーサーを、PCBには2.5mmなべネジで3mmのスペーサーを使いました。
+      </p>
+      <p><img src="img/IMG_4954.jpg" class="image"></p>
+      <p>
+        ミドルプレートをスペーサーに通して挟み込みます。私はキーボード作りでこの瞬間が一番好きです。
+      </p>
+      <p><img src="img/IMG_4955.jpg" class="image"></p>
+      <p>
+        ボトムプレートをねじ止めしてゴム足を付けます。
+      </p>
+      <p><img src="img/IMG_4957.jpg" class="image"></p>
+      <p>
+        キーキャップを付けたら完成です。
+      </p>
+      <p><img src="img/IMG_4963.jpg" class="image"></p>
+
+      <h2 id=done>撮影</h2>
+      <p>
+        せっかく作ったので写真撮影もしました。カメラに詳しくないので苦手だったのですが、
+        <a href="https://adventar.org/calendars/6470">KEEB_PD Advent Calendar 2021</a>でSixeightさんが紹介されていた自然光で撮影する方法を真似たところとても綺麗に撮れるようになりました。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://blog.nishimu.land/entry/2021/12/06/033242">機材がなくてもなんとかなるキーボードの手抜き撮影</a></li>
+       </ul>
+      </p>
+      <p><img src="img/IMG_5196.jpg" class="image"></p>
+      LEDを発光させた状態の撮影が難しいです。
+      <p><img src="img/IMG_5174.jpg" class="image"></p>
+      <h2 id=cncl>おわりに</h2>
+      <p>
+        今回作成したファイルはこちらからダウンロードできます。
+      </p>
+      <p>
+       <ul>
+         <li><a href="https://github.com/Taro-Hayashi/Taro-Hayashi.github.io/releases/download/1.0/armors_np.zip">armors_np.zip</a></li>
+       </ul>
+      </p>
+      <p>
+        発注した部品の余りを使ってキットにしました。
+        4キットだけですが価格はほぼ原価にしています。
+        いいなと思ったら買っていただけると嬉しいです。
+      </p>
+    </p>
+    <p>
+     <ul>
+       <li><a href="https://tarohayashi.booth.pm/items/3430729">BOOTH - Armors せまピッチ</a></li>
+     </ul>
+    </p>
+    <p>
+    <p>
+      この記事はcool844V2、Jones、Pop'n Top せまピッチで書きました。
+    </p>
+    <p>
+     <ul>
+       <li><a href="https://mki0002ozlet.booth.pm/items/3267681">BOOTH - cool844V2</a></li>
+       <li><a href="https://shop.yushakobo.jp/products/2798">遊舎工房 - Jones</a></li>
+     </ul>
+    </p>
+    <p><img src="img/IMG_5288.jpg" class="image"></p>
+    <p>
+      Pop'n Top せまピッチはこのキーパッドと同じ発想で作った分割キーボードです。
+      こちらも少量頒布するつもりだったのですが左右間通信が上手くいかなくて断念しました。
+      電源の配線が悪そうだと思っていますがよくわかりません。残念です。
+    </p>
+    <p>
+      <a href="https://twitter.com/4py1">よっぴさん</a>が主催されていた<a href="https://twitter.com/hashtag/%E3%83%9C%E3%83%84%E3%82%AD%E3%83%BC%E4%BA%A4%E6%8F%9B#">ボツキー交換</a>に出そうか迷ったのですが、
+      キットに出来るだけのアクリルとパーツも余っているのでとりあえず自分用のスペアにしつつ、没キットごと交換できるような機会があればそちらに出したいなと思っています。
+    </p>
+    <p>
+      年の終わりが近づいていますがアドベントカレンダーはまだまだ続きます。
+      昨日までの記事もたくさんありますので家に篭りがちなコロナ禍の冬に読み返してみてはいかがでしょうか。
+    </p>
+    <p>
+     <ul>
+       <li><a href="https://adventar.org/calendars/6246">キーボード #1 Advent Calendar 2021</a></li>
+       <li><a href="https://adventar.org/calendars/6280">キーボード #2 Advent Calendar 2021</a></li>
+       <li><a href="https://adventar.org/calendars/6496">キーボード #3 Advent Calendar 2021</a></li>
+       <li><a href="https://adventar.org/calendars/6470">KEEB_PD Advent Calendar 2021</a></li>
+       <li><a href="https://adventar.org/calendars/7086">PRK Firmware Advent Calendar 2021</a></li>
+     </ul>
+    </p>
+    <p>
+      はやしたろう（<a href="https://twitter.com/w_vwbw">@w_vwbw</a>）
+    </p>
+    <p><a href="https://Taro-Hayashi.github.io/">戻る</a></p>
+  </body>
+</html>
